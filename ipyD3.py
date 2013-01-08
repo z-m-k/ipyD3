@@ -704,10 +704,8 @@ function utfDecode(x){
         html=['<html>',
               '<head>',
               '<title></title>',
-              '<script src="http://zmks.co/jquery.js"></script>',
-              '<script src="http://d3js.org/d3.v2.min.js"></script>',
-              '<script src="http://zmks.co/cie.js"></script>',
-              '<script src="http://zmks.co/crossfilter.min.js"></script>',] +\
+              '<script src="http://code.jquery.com/jquery-1.8.3.min.js"></script>',
+              '<script src="http://d3js.org/d3.v3.min.js"></script>',] +\
               html +\
               ['</body>',
               '</html>',]

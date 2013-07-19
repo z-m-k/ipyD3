@@ -1,5 +1,6 @@
 from __future__ import division
 import numpy
+import shlex
 from uuid import uuid1
 class d3object:
     def __init__(self,
@@ -721,8 +722,8 @@ function utfDecode(x){
         temp.flush()
         temp.close()
 
-        phantomJs=r'''c:\\Phantom\\phantomjs.exe {0} {1}'''.format(tempJs.name, temp.name)
-        phantomJsProc = subprocess.Popen( phantomJs, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+        phantomJs=r'''phantomjs {0} {1}'''.format(tempJs.name, temp.name)
+        phantomJsProc = subprocess.Popen( shlex.split(phantomJs), stdout = subprocess.PIPE, stderr = subprocess.PIPE)
         
         html = ''
         err = ''

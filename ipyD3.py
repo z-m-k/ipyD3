@@ -40,7 +40,7 @@ function utfDecode(x){
     }
 }
         ''','']
-
+ 
         if style in (None, ''):
             self.html='{0}\n{1}\n{2}'.format(topHtml, self.html, bottomHtml)
         elif style=='JFFigure':
@@ -65,7 +65,7 @@ function utfDecode(x){
                                  self.html,
                                 ))
             self.addCss(self.getStandardCss('jfCss'))
-
+ 
         if d3!=None:
             if d3.__class__.__name__=='d3object':
                 if d3.css!='\n'+self.getStandardCss('jfCss'):
@@ -99,11 +99,11 @@ function utfDecode(x){
                 html='<style>\n{0}\n</style>\n{1}'.format(self.css, self.html)
             publish_html(html)
             self.html=''
-
+ 
     def removeTestObject(self):
         from IPython.core.display import publish_javascript
         publish_javascript('''$('#d3TestOutput').remove();''')
-
+ 
     def convertVar(self, var):
         typeVar=type(var)
         if typeVar==numpy.ndarray:
@@ -122,11 +122,11 @@ function utfDecode(x){
         else:
             print typeVar
             raise TypeError
-
+ 
     def addVar(self, **kw):
         for k in kw:
             self.varsToPass[k]=self.convertVar(kw[k])
-
+ 
     def getJsInputs(self):
         jsInputs=[]
         inputs=self.varsToPass
@@ -143,17 +143,17 @@ function utfDecode(x){
             jsInputs.append(outTemp)
         jsInputs='\n'.join(['var '+i+';' for i in jsInputs]).replace("u'", "'")
         self.jsInputs=jsInputs
-
+ 
     def addJs(self, jsStr):
         if type(jsStr)!=str:
            raise TypeError
         self.js.append(jsStr)
-
+ 
     def addCss(self, css):
         if type(css)!=str:
            raise TypeError
         self.css+='\n{0}'.format(css)
-
+ 
     def pValsStar(self, dataAdd, index=0):
         if len(dataAdd)==0:
             return
@@ -167,7 +167,7 @@ function utfDecode(x){
                 elif x<=0.1:   dataAdd[index][i][j]='&#x2605;'
                 elif x<=1:     dataAdd[index][i][j]=''
                 else:          dataAdd[index][i][j]='Error'
-
+ 
     def addTable(self,
          data=[],
          dataAdd=[],
@@ -230,7 +230,7 @@ function utfDecode(x){
             sRows = ['' for _ in data[0]]
         if sColumns==None:
             sColumns = ['' for _ in data]
-
+ 
         colorDomain=[0,1]
         if colorDomainAuto>0:
             colorRangeData=data
@@ -241,7 +241,7 @@ function utfDecode(x){
                     for j in xrange(len(data[0])):
                         if j in colorDomainAutoIgnoreColumns: continue
                         colorRangeData.append(data[i][j])
-
+ 
             if colorDomainAuto==2:
                 avgRes=numpy.average(colorRangeData)
                 stdRes=numpy.std(colorRangeData, dtype=numpy.float64, ddof=1)
@@ -250,7 +250,7 @@ function utfDecode(x){
                                 min(numpy.max(colorRangeData),avgRes+stdRes/nObs*1.96)]
             if colorDomainAuto==1:
                 colorDomain=[numpy.min(colorRangeData),numpy.max(colorRangeData)]
-
+ 
         if colorDomainSymmetric:
             colorDomain=max(numpy.fabs(colorDomain))
             colorDomain=[-colorDomain, colorDomain]
@@ -259,7 +259,7 @@ function utfDecode(x){
             colorDomain=[colorDomainMin, colorDomain[1]]
         if colorDomainMax:
             colorDomain=[colorDomain[0], colorDomainMax]
-
+ 
         colorRangeLen=len(colorRange)
         colorDomain=(numpy.array([i/colorRangeLen for i in xrange(colorRangeLen+1)])*(colorDomain[1]-colorDomain[0])+colorDomain[0]).tolist()
         self.addVar(  figTag=figTag,
@@ -300,18 +300,18 @@ function utfDecode(x){
         Array.prototype.sum = function() {
           return this.reduce(function(a,b){return a+b;});
         }
-
+ 
         var svg = d3.select("#"+d3ObjId)
                         .append("svg")
                         .attr("width", width)
                         .attr("height", height)
                         .style("border-bottom", "1px solid black")
-
+ 
         var color = d3.scale.linear()
                         .domain(colorDomain)
                         .range(colorRange);
-
-
+ 
+ 
         //_________________________________________________________________________________
         //
         //Heatmap drawing function
@@ -329,19 +329,19 @@ function utfDecode(x){
                              rectHeight,
                              svg,
                              objId){
-
+ 
             var heatmap=svg.append("svg")
                           .attr("class", "heatmap")
                           .attr("y", y)
                           .attr("x", x)
                           .attr("id", objId)
-
+ 
             var addLength = dataAdd.length;
             if(heatmapIgnoreText==1)
                 var cumulHeight=rectHeight-fontSizeCells.sum()-(addLength+1)*2;
             else
                 var cumulHeight=rectHeight-fillProportion-fontSizeCells.sum()-(addLength+1)*2;
-
+ 
             var borderOffset=[0,0];
             if(addOutsideBorders>=0&&objId=='smallHeatmap')
                 borderOffset=[addOutsideBorders+1,addOutsideBorders+1];
@@ -431,7 +431,7 @@ function utfDecode(x){
                                             +(sColsMargins.sum()-sColsMargins.slice(0,k+1).sum()+5)+"");
                             z=0;
                         }
-
+ 
                   }
                 }
                 //Rows
@@ -463,7 +463,7 @@ function utfDecode(x){
                 }
             }
         }
-
+ 
         //_________________________________________________________________________________
         //
         //Legend for a heatmap
@@ -485,25 +485,25 @@ function utfDecode(x){
                 .attr("height", legendSize[1])
                 .attr("transform", "translate(5,0)")
         }
-
+ 
         var legendScale = d3.scale.linear()
                     .domain([colorDomain[0], colorDomain[colorDomain.length-1]])
                     .range([0,legendSize[0]]);
-
+ 
         var legendXAxis = d3.svg.axis()
                         .scale(legendScale)
                         .orient("bottom")
                         .tickSize(0,0,0)
                         .tickValues(tickValues)
-
-
+ 
+ 
         legendObj.append("g")
             .attr('class', 'axis')
             .attr("transform", "translate(5," + legendSize[1] + ")")
             .call(legendXAxis);
-
-
-
+ 
+ 
+ 
         }
         function drawLegendVert(legendSize, x, y, tickValues, colorDomain, color, svg){
         var legendcolorRangecale=d3.scale.linear()
@@ -525,25 +525,25 @@ function utfDecode(x){
                 .attr("height", legendSize[2])
                 .attr("transform", "translate(5,0)")
         }
-
+ 
         var legendScale = d3.scale.linear()
                     .domain([colorDomain[0], colorDomain[colorDomain.length-1]])
                     .range([5,legendSize[0]-5]);
-
+ 
         var legendXAxis = d3.svg.axis()
                         .scale(legendScale)
                         .orient("right")
                         .tickSize(0,0,0)
                         .ticks(5)
-
-
+ 
+ 
         legendObj.append("g")
             .attr('class', 'axis')
             .attr("transform", "translate("+(legendSize[1]*1.5)+"," + (0*legendSize[1]) + ")")
             .call(legendXAxis);
-
-
-
+ 
+ 
+ 
         }
         function drawLegendBox(x, y, rectWidth, rectHeight, svg){
             var legendObj=svg.append("svg")
@@ -551,19 +551,19 @@ function utfDecode(x){
                       //.attr("height", legendSize[1]+12)
                       .attr("y", y-rectHeight)
                       .attr("x", x)
-
+ 
             var addLength = dataAdd.length;
             var cumulHeight=fontSizeCellsLabels.sum()+addLength*2;
             var g=legendObj.append("g")
                     .attr("class", "heatmapCell")
-
+ 
             g.append("rect")
                 .attr("x", 1)
                 .attr("y", rectHeight-heatmap.fillProportion/heatmap.rectHeight*rectHeight)
                 .attr("fill", colorRange[0])
                 .attr("width", rectWidth-1)
                 .attr("height", heatmap.fillProportion/heatmap.rectHeight*rectHeight)
-
+ 
             g.append("text")
                 .attr("x", rectWidth-5)
                 .attr("y", rectHeight-cumulHeight-5-heatmap.fillProportion)
@@ -579,13 +579,13 @@ function utfDecode(x){
                     .style("font-size", fontSizeCellsLabels[k+1]+"px")
                     .attr("text-anchor", "end")
                     .text(varLabels[k+1]);
-
+ 
             }
             g.append("polyline")
                 .attr("points", "1,1 "+ (rectWidth-1) +",1 "+ (rectWidth-1) +","+rectHeight+" 1,"+rectHeight+" 1,1")
-
+ 
         }
-
+ 
         var regressionResults=svg.append("g").attr('id', 'svgElement'+d3ObjId+figTag)
         if(heatmap.draw==1){
             drawHeatmap(data/*data*/,
@@ -642,22 +642,22 @@ function utfDecode(x){
                     colorDomain/*colorDomain*/,
                     color/*color*/,
                     regressionResults/*svg*/);
-
+ 
         var objWidth=document.getElementById('svgElement'+d3ObjId+figTag).getBoundingClientRect()['width']
         var objHeight=document.getElementById('svgElement'+d3ObjId+figTag).getBoundingClientRect()['height']
         regressionResults.attr("transform", "translate("+ ((width-objWidth)/2) +","+ ((height-objHeight)/2) + ")")
         ''')
-
+ 
     def getPhantomJsScript(self, mode):
         if 'html' in mode:
             phantomJs='''
                 var page = require('webpage').create(),
                     system = require('system'),
                     address, elementHtml;
-
+ 
                 address = system.args[1];
                 page.viewportSize = { width: 600, height: 600 };
-
+ 
                 page.open(address, function (status) {
                     if (status !== 'success') {
                         console.log('Unable to load the address!');
@@ -673,8 +673,28 @@ function utfDecode(x){
                     }
                 });
             '''
+        elif 'png' in mode:
+            phantomJs='''
+                var page = require('webpage').create(),
+                    system = require('system'),
+                    address, elementHtml;
+ 
+                address = system.args[1];
+                page.viewportSize = { width: 600, height: 600 };
+ 
+                page.open(address, function (status) {
+                    if (status !== 'success') {
+                        console.log('Unable to load the address!');
+                    } else {
+                        window.setTimeout(function () {
+                            console.log(page.renderBase64('PNG'));
+                            phantom.exit(1);
+                        }, 1000);
+                    }
+                });
+            '''
         return phantomJs
-
+ 
     def render(self, mode=['html'], fileName=None):
         if type(mode) not in (list, tuple):
             mode=(mode,)
@@ -696,7 +716,7 @@ function utfDecode(x){
             from IPython.core.display import publish_html
             publish_html(html)
             return True
-
+ 
         import tempfile
         from os import unlink
         import subprocess
@@ -711,17 +731,17 @@ function utfDecode(x){
               ['</body>',
               '</html>',]
         html='\n'.join(html)
-
+ 
         tempJs=tempfile.NamedTemporaryFile(mode="w+b", delete=False, suffix='.js')
         tempJs.write(self.getPhantomJsScript(mode))
         tempJs.flush()
         tempJs.close()
-
+ 
         temp=tempfile.NamedTemporaryFile(mode="w+b", delete=False, suffix='.htm')
         temp.write(html)
         temp.flush()
         temp.close()
-
+ 
         phantomJs=r'''phantomjs {0} {1}'''.format(tempJs.name, temp.name)
         phantomJsProc = subprocess.Popen( shlex.split(phantomJs), stdout = subprocess.PIPE, stderr = subprocess.PIPE)
         
@@ -730,10 +750,10 @@ function utfDecode(x){
         while phantomJsProc.poll() is None:
             sleep( 0.1 )
             html, err = phantomJsProc.communicate()
-
+ 
         unlink(temp.name)
         unlink(tempJs.name)
-
+ 
         if 'html' in mode:
             if 'only' in mode:
                 return html
@@ -758,7 +778,21 @@ function utfDecode(x){
                 publish_html(html)
                 return True
             return html
+        elif 'png' in mode:
+            if 'only' in mode:
+                return html
+            if 'file'in mode and fileName!=None:
+                fileOpen=open(fileName,'wb')
+                fileOpen.write(html)
+                fileOpen.close()
+                return True
+            if 'show'in mode:
+                from IPython.core.display import publish_png
+                publish_png(html)
+                return True
+            return html
 
+ 
     def addSimpleTable(self,
                  data, 
                  dataAdd=[], 
@@ -774,7 +808,7 @@ function utfDecode(x){
                  addBorders=1,
                  addOutsideBorders=-1,
                  rectWidth=45,
-                 rectHeight=0,  	 
+                 rectHeight=0,       
                  ):
         if len(fontSizeCells)==0:
             fontSizeCells=[12]*(1+len(dataAdd))
@@ -813,10 +847,13 @@ function utfDecode(x){
         
     def addPageBreak(self):
         self.addJs('''$("#"+d3ObjId).append('<div style="page-break-after:always; display:block; width:1px; height:1px;">&nbsp;</div>')''')
-
+ 
     def getStandardCss(self, mode='jfCss'):
         if mode=='jfCss':
             return'''
+                    html{
+                        font-family: sans-serif;
+                    }
                     .d3Output{
                         min-height: 1.2em;
                         line-height: 1.2em;

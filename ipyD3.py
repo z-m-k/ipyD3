@@ -12,7 +12,9 @@ class d3object:
                  test=False,
                  precision=4,
                  d3=None,
+                 phantomExec='phantomjs',
                  **kw):
+        self.phantomExec = phantomExec
         self.id='id-{0}'.format(uuid1())
         self.html='<div id="{0}" class="d3Output"></div>'.format(self.id)
         self.css=''
@@ -76,7 +78,7 @@ function utfDecode(x){
             
         self.publish=publish
         if publish:
-            from IPython.core.display import publish_html
+            from IPython.display import HTML
             if test:
                 from IPython.core.display import publish_javascript
                 publish_javascript('''$('#d3TestOutput').remove();''')
@@ -96,8 +98,8 @@ function utfDecode(x){
                 html='</script><style>\n{0}\n</style>'.format(self.css)
             else:
                 html='<style>\n{0}\n</style>\n{1}'.format(self.css, self.html)
-            publish_html(html)
-            self.html=''
+            return HTML(html)
+            #self.html=''
 
     def removeTestObject(self):
         from IPython.core.display import publish_javascript
@@ -692,9 +694,8 @@ function utfDecode(x){
               ]
         if self.publish:
             html='\n'.join(html)
-            from IPython.core.display import publish_html
-            publish_html(html)
-            return True
+            from IPython.display import HTML
+            return HTML(html)
 
         import tempfile
         from os import unlink
@@ -721,8 +722,9 @@ function utfDecode(x){
         temp.flush()
         temp.close()
 
-        phantomJs=r'''c:\\Phantom\\phantomjs.exe {0} {1}'''.format(tempJs.name, temp.name)
-        phantomJsProc = subprocess.Popen( phantomJs, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+        phantomJsArgs = (self.phantomExec, tempJs.name, temp.name)
+
+        phantomJsProc = subprocess.Popen( phantomJsArgs,  stdout = subprocess.PIPE, stderr = subprocess.PIPE)
         
         html = ''
         err = ''
@@ -753,9 +755,8 @@ function utfDecode(x){
                 return True
             html='\n'.join(['<style>',self.css,'</style>'])+html
             if 'show'in mode:
-                from IPython.core.display import publish_html
-                publish_html(html)
-                return True
+                from IPython.display import HTML
+                return HTML(html)
             return html
 
     def addSimpleTable(self,
@@ -773,7 +774,7 @@ function utfDecode(x){
                  addBorders=1,
                  addOutsideBorders=-1,
                  rectWidth=45,
-                 rectHeight=0,  	 
+                 rectHeight=0,       
                  ):
         if len(fontSizeCells)==0:
             fontSizeCells=[12]*(1+len(dataAdd))

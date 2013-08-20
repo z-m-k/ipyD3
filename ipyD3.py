@@ -1,6 +1,6 @@
 from __future__ import division
+from titlecase import titlecase
 import numpy
-import shlex
 from uuid import uuid1
 class d3object:
     def __init__(self,
@@ -13,15 +13,20 @@ class d3object:
                  test=False,
                  precision=4,
                  d3=None,
+                 phantomExec='phantomjs',
+                 keepTempDir='',
                  **kw):
         self.id='id-{0}'.format(uuid1())
+        self.phantomExec = phantomExec
+        self.keepTempDir = keepTempDir
+        self.width=width
         self.html='<div id="{0}" class="d3Output"></div>'.format(self.id)
         self.css=''
         self.varsToPass={'width':width,
                          'height':height,
                          'd3ObjId':self.id,
                          }
-                
+
         self.precision=precision
         self.js=['''
 var None=null;
@@ -40,7 +45,7 @@ function utfDecode(x){
     }
 }
         ''','']
- 
+
         if style in (None, ''):
             self.html='{0}\n{1}\n{2}'.format(topHtml, self.html, bottomHtml)
         elif style=='JFFigure':
@@ -50,7 +55,7 @@ function utfDecode(x){
                                   '''
                                      .format(width,
                                              ' '+str(kw['number']) if 'number' in kw else '',
-                                             ' '+str(kw['title'])+'.' if 'title' in kw else '',
+                                             ' '+titlecase(str(kw['title']))+'.' if 'title' in kw else '',
                                              ' '+str(kw['desc']) if 'desc' in kw else '',
                                              ),
                                 ))
@@ -59,13 +64,23 @@ function utfDecode(x){
             self.html='\n'.join(('<div class="d3Output header" style="width: {0}px;">Table{1}</div>'
                                     .format(width, ' '+str(kw['number']) if 'number' in kw else ''),
                                  '<div class="d3Output title" style="width: {0}px;">{1}</div>'
-                                     .format(width, ' '+str(kw['title']) if 'title' in kw else ''),
+                                     .format(width, ' '+titlecase(str(kw['title'])) if 'title' in kw else ''),
                                  '<div class="d3Output description" style="width: {0}px">{1}</div>'
                                      .format(width, ' '+str(kw['desc']) if 'desc' in kw else ''),
                                  self.html,
                                 ))
             self.addCss(self.getStandardCss('jfCss'))
- 
+        elif style=='JFTableFigure':
+            self.html='\n'.join(('<div class="d3Output header" style="width: {0}px;">Figure{1}</div>'
+                                    .format(width, ' '+str(kw['number']) if 'number' in kw else ''),
+                                 '<div class="d3Output title" style="width: {0}px;">{1}</div>'
+                                     .format(width, ' '+titlecase(str(kw['title'])) if 'title' in kw else ''),
+                                 '<div class="d3Output description" style="width: {0}px">{1}</div>'
+                                     .format(width, ' '+str(kw['desc']) if 'desc' in kw else ''),
+                                 self.html,
+                                ))
+            self.addCss(self.getStandardCss('jfCss'))
+
         if d3!=None:
             if d3.__class__.__name__=='d3object':
                 if d3.css!='\n'+self.getStandardCss('jfCss'):
@@ -73,42 +88,24 @@ function utfDecode(x){
                 d3.addPageBreak()
                 self.html='\n'.join((d3.render(mode=('only','html')),self.html))
             else:
-                raise TypeError            
-            
+                raise TypeError
+
         self.publish=publish
         if publish:
-            from IPython.core.display import publish_html
-            if test:
-                from IPython.core.display import publish_javascript
-                publish_javascript('''$('#d3TestOutput').remove();''')
-                html=u'''
-                <div id="d3TestOutput"
-                    style="
-                        position: absolute;
-                        z-index:100;
-                        right:-2px;
-                        top:100px;
-                        background: rgba(255, 255, 255, 1);
-                        display:block
-                 ">
-                {0}
-                </div>'''.format(self.html)
-                publish_javascript('''$('#toolbar').append('{0}');'''.format(html.replace('\n','')))
-                html='</script><style>\n{0}\n</style>'.format(self.css)
-            else:
-                html='<style>\n{0}\n</style>\n{1}'.format(self.css, self.html)
-            publish_html(html)
+            from IPython.display import HTML
+            html='<style>\n{0}\n</style>\n{1}'.format(self.css, self.html)
+            return HTML(html)
             self.html=''
- 
+
     def removeTestObject(self):
         from IPython.core.display import publish_javascript
         publish_javascript('''$('#d3TestOutput').remove();''')
- 
+
     def convertVar(self, var):
         typeVar=type(var)
         if typeVar==numpy.ndarray:
             return self.convertVar(var.tolist())
-        elif typeVar == float:
+        elif typeVar == float or typeVar == numpy.float64:
             return round(var, self.precision)
         elif typeVar == list:
             return [self.convertVar(i) for i in var]
@@ -122,11 +119,11 @@ function utfDecode(x){
         else:
             print typeVar
             raise TypeError
- 
+
     def addVar(self, **kw):
         for k in kw:
             self.varsToPass[k]=self.convertVar(kw[k])
- 
+
     def getJsInputs(self):
         jsInputs=[]
         inputs=self.varsToPass
@@ -143,17 +140,17 @@ function utfDecode(x){
             jsInputs.append(outTemp)
         jsInputs='\n'.join(['var '+i+';' for i in jsInputs]).replace("u'", "'")
         self.jsInputs=jsInputs
- 
+
     def addJs(self, jsStr):
         if type(jsStr)!=str:
            raise TypeError
         self.js.append(jsStr)
- 
+
     def addCss(self, css):
         if type(css)!=str:
            raise TypeError
         self.css+='\n{0}'.format(css)
- 
+
     def pValsStar(self, dataAdd, index=0):
         if len(dataAdd)==0:
             return
@@ -167,7 +164,12 @@ function utfDecode(x){
                 elif x<=0.1:   dataAdd[index][i][j]='&#x2605;'
                 elif x<=1:     dataAdd[index][i][j]=''
                 else:          dataAdd[index][i][j]='Error'
- 
+
+    def addPanel(self, title=''):
+        html=u'''<div class="figtags panel description" style="width: {0}px">{1}</div>'''.format(self.width, title).replace('\n','')
+        self.addJs(''' $("#{0}").append('{html}');'''.format(self.id, html=html))
+        return '-tag-{0}'.format(uuid1())
+
     def addTable(self,
          data=[],
          dataAdd=[],
@@ -219,6 +221,8 @@ function utfDecode(x){
         colorDomainAuto=1,
         colorDomainAutoIgnoreColumns=[],
         colorDomainAutoIgnoreRows=[],
+        colorDomainIgnoreColumns=[],
+        colorDomainIgnoreRows=[],
         colorRange=['#B9FB8A', '#9BF293', '#7EE79D', '#65DCA6', '#51CFAD', '#43C3B1', '#3FB5B3',
                 '#43A7B2', '#4C99AD', '#568BA6', '#5F7D9C', '#656F8F', '#696181', '#6A5471',
                 '#684861', '#633D51', '#5B3341', '#522A33', '#472226', '#3B1B1A', '#2E1510']
@@ -230,7 +234,7 @@ function utfDecode(x){
             sRows = ['' for _ in data[0]]
         if sColumns==None:
             sColumns = ['' for _ in data]
- 
+
         colorDomain=[0,1]
         if colorDomainAuto>0:
             colorRangeData=data
@@ -241,7 +245,7 @@ function utfDecode(x){
                     for j in xrange(len(data[0])):
                         if j in colorDomainAutoIgnoreColumns: continue
                         colorRangeData.append(data[i][j])
- 
+
             if colorDomainAuto==2:
                 avgRes=numpy.average(colorRangeData)
                 stdRes=numpy.std(colorRangeData, dtype=numpy.float64, ddof=1)
@@ -250,7 +254,7 @@ function utfDecode(x){
                                 min(numpy.max(colorRangeData),avgRes+stdRes/nObs*1.96)]
             if colorDomainAuto==1:
                 colorDomain=[numpy.min(colorRangeData),numpy.max(colorRangeData)]
- 
+
         if colorDomainSymmetric:
             colorDomain=max(numpy.fabs(colorDomain))
             colorDomain=[-colorDomain, colorDomain]
@@ -259,7 +263,7 @@ function utfDecode(x){
             colorDomain=[colorDomainMin, colorDomain[1]]
         if colorDomainMax:
             colorDomain=[colorDomain[0], colorDomainMax]
- 
+
         colorRangeLen=len(colorRange)
         colorDomain=(numpy.array([i/colorRangeLen for i in xrange(colorRangeLen+1)])*(colorDomain[1]-colorDomain[0])+colorDomain[0]).tolist()
         self.addVar(  figTag=figTag,
@@ -281,7 +285,11 @@ function utfDecode(x){
                     sRowsMargins=sRowsMargins,
                     sColsMargins=sColsMargins,
                     shrinkHeadersBorders=shrinkHeadersBorders,
-                    rightPaneOffset=rightPaneOffset
+                    rightPaneOffset=rightPaneOffset,
+                    colorDomainIgnoreColumns=colorDomainIgnoreColumns,
+                    colorDomainIgnoreRows=colorDomainIgnoreRows,
+                    colorDomainMin=colorDomainMin if colorDomainMin else 'false',
+                    colorDomainMax=colorDomainMax if colorDomainMax else 'false',
                   )
         self.addCss('''
             .heatmapCell path, .heatmapCell line, .heatmapCell polyline, .d3Output polyline {
@@ -300,18 +308,27 @@ function utfDecode(x){
         Array.prototype.sum = function() {
           return this.reduce(function(a,b){return a+b;});
         }
- 
+
         var svg = d3.select("#"+d3ObjId)
                         .append("svg")
                         .attr("width", width)
                         .attr("height", height)
                         .style("border-bottom", "1px solid black")
- 
+
         var color = d3.scale.linear()
                         .domain(colorDomain)
                         .range(colorRange);
- 
- 
+
+        function getColor(data){
+            if(colorDomainMin!='false')
+                if(colorDomainMin>data)
+                    return color(colorDomainMin);
+            if(colorDomainMax!='false')
+                if(colorDomainMax<data)
+                    return color(colorDomainMax);
+            return color(data);
+
+        }
         //_________________________________________________________________________________
         //
         //Heatmap drawing function
@@ -329,19 +346,19 @@ function utfDecode(x){
                              rectHeight,
                              svg,
                              objId){
- 
+
             var heatmap=svg.append("svg")
                           .attr("class", "heatmap")
                           .attr("y", y)
                           .attr("x", x)
                           .attr("id", objId)
- 
+
             var addLength = dataAdd.length;
             if(heatmapIgnoreText==1)
                 var cumulHeight=rectHeight-fontSizeCells.sum()-(addLength+1)*2;
             else
                 var cumulHeight=rectHeight-fillProportion-fontSizeCells.sum()-(addLength+1)*2;
- 
+
             var borderOffset=[0,0];
             if(addOutsideBorders>=0&&objId=='smallHeatmap')
                 borderOffset=[addOutsideBorders+1,addOutsideBorders+1];
@@ -356,12 +373,13 @@ function utfDecode(x){
                     var g=heatmap.append("g")
                             .attr("class", "heatmapCell")
                             .attr("transform", "translate("+ (borderOffset[0]+(i)*(rectWidth+spacing)+addTextRows*(sRowsMargins.sum()+5)) +","+ (borderOffset[1]+(j)*(rectHeight+spacing)+addTextRows*(sColsMargins.sum()+5)) + ")")
-                    g.append("rect")
-                        .attr("y", rectHeight-fillProportion)
-                        .attr("fill", color(data[j][i]))
-                        .attr("id", "heatCell")
-                        .attr("width", rectWidth)
-                        .attr("height", fillProportion)
+                    if(colorDomainIgnoreRows.indexOf(j)==-1 && colorDomainIgnoreColumns.indexOf(i)==-1)
+                        g.append("rect")
+                            .attr("y", rectHeight-fillProportion)
+                            .attr("fill", getColor(data[j][i]))
+                            .attr("id", "heatCell")
+                            .attr("width", rectWidth)
+                            .attr("height", fillProportion)
                     if(addText||addText==1){
                         g.append("text")
                             .attr("x", rectWidth-5)
@@ -431,7 +449,7 @@ function utfDecode(x){
                                             +(sColsMargins.sum()-sColsMargins.slice(0,k+1).sum()+5)+"");
                             z=0;
                         }
- 
+
                   }
                 }
                 //Rows
@@ -463,7 +481,7 @@ function utfDecode(x){
                 }
             }
         }
- 
+
         //_________________________________________________________________________________
         //
         //Legend for a heatmap
@@ -485,25 +503,25 @@ function utfDecode(x){
                 .attr("height", legendSize[1])
                 .attr("transform", "translate(5,0)")
         }
- 
+
         var legendScale = d3.scale.linear()
                     .domain([colorDomain[0], colorDomain[colorDomain.length-1]])
                     .range([0,legendSize[0]]);
- 
+
         var legendXAxis = d3.svg.axis()
                         .scale(legendScale)
                         .orient("bottom")
                         .tickSize(0,0,0)
                         .tickValues(tickValues)
- 
- 
+
+
         legendObj.append("g")
             .attr('class', 'axis')
             .attr("transform", "translate(5," + legendSize[1] + ")")
             .call(legendXAxis);
- 
- 
- 
+
+
+
         }
         function drawLegendVert(legendSize, x, y, tickValues, colorDomain, color, svg){
         var legendcolorRangecale=d3.scale.linear()
@@ -525,25 +543,25 @@ function utfDecode(x){
                 .attr("height", legendSize[2])
                 .attr("transform", "translate(5,0)")
         }
- 
+
         var legendScale = d3.scale.linear()
                     .domain([colorDomain[0], colorDomain[colorDomain.length-1]])
                     .range([5,legendSize[0]-5]);
- 
+
         var legendXAxis = d3.svg.axis()
                         .scale(legendScale)
                         .orient("right")
                         .tickSize(0,0,0)
                         .ticks(5)
- 
- 
+
+
         legendObj.append("g")
             .attr('class', 'axis')
             .attr("transform", "translate("+(legendSize[1]*1.5)+"," + (0*legendSize[1]) + ")")
             .call(legendXAxis);
- 
- 
- 
+
+
+
         }
         function drawLegendBox(x, y, rectWidth, rectHeight, svg){
             var legendObj=svg.append("svg")
@@ -551,19 +569,19 @@ function utfDecode(x){
                       //.attr("height", legendSize[1]+12)
                       .attr("y", y-rectHeight)
                       .attr("x", x)
- 
+
             var addLength = dataAdd.length;
             var cumulHeight=fontSizeCellsLabels.sum()+addLength*2;
             var g=legendObj.append("g")
                     .attr("class", "heatmapCell")
- 
+
             g.append("rect")
                 .attr("x", 1)
                 .attr("y", rectHeight-heatmap.fillProportion/heatmap.rectHeight*rectHeight)
                 .attr("fill", colorRange[0])
                 .attr("width", rectWidth-1)
                 .attr("height", heatmap.fillProportion/heatmap.rectHeight*rectHeight)
- 
+
             g.append("text")
                 .attr("x", rectWidth-5)
                 .attr("y", rectHeight-cumulHeight-5-heatmap.fillProportion)
@@ -579,13 +597,13 @@ function utfDecode(x){
                     .style("font-size", fontSizeCellsLabels[k+1]+"px")
                     .attr("text-anchor", "end")
                     .text(varLabels[k+1]);
- 
+
             }
             g.append("polyline")
                 .attr("points", "1,1 "+ (rectWidth-1) +",1 "+ (rectWidth-1) +","+rectHeight+" 1,"+rectHeight+" 1,1")
- 
+
         }
- 
+
         var regressionResults=svg.append("g").attr('id', 'svgElement'+d3ObjId+figTag)
         if(heatmap.draw==1){
             drawHeatmap(data/*data*/,
@@ -642,22 +660,22 @@ function utfDecode(x){
                     colorDomain/*colorDomain*/,
                     color/*color*/,
                     regressionResults/*svg*/);
- 
+
         var objWidth=document.getElementById('svgElement'+d3ObjId+figTag).getBoundingClientRect()['width']
         var objHeight=document.getElementById('svgElement'+d3ObjId+figTag).getBoundingClientRect()['height']
         regressionResults.attr("transform", "translate("+ ((width-objWidth)/2) +","+ ((height-objHeight)/2) + ")")
         ''')
- 
-    def getPhantomJsScript(self, mode):
+
+    def getPhantomJsScript(self, mode, renderTime=1000):
         if 'html' in mode:
             phantomJs='''
                 var page = require('webpage').create(),
                     system = require('system'),
                     address, elementHtml;
- 
+
                 address = system.args[1];
                 page.viewportSize = { width: 600, height: 600 };
- 
+
                 page.open(address, function (status) {
                     if (status !== 'success') {
                         console.log('Unable to load the address!');
@@ -669,19 +687,19 @@ function utfDecode(x){
                             });
                             console.log(elementHtml);
                             phantom.exit(1);
-                        }, 200);
+                        }, %s);
                     }
                 });
-            '''
+            ''' % (renderTime)
         elif 'png' in mode:
             phantomJs='''
                 var page = require('webpage').create(),
                     system = require('system'),
                     address, elementHtml;
- 
+
                 address = system.args[1];
-                page.viewportSize = { width: 600, height: 600 };
- 
+                page.viewportSize = { width: 1, height: 1 };
+
                 page.open(address, function (status) {
                     if (status !== 'success') {
                         console.log('Unable to load the address!');
@@ -689,13 +707,13 @@ function utfDecode(x){
                         window.setTimeout(function () {
                             console.log(page.renderBase64('PNG'));
                             phantom.exit(1);
-                        }, 1000);
+                        }, %s);
                     }
                 });
-            '''
+            ''' % (renderTime)
         return phantomJs
- 
-    def render(self, mode=['html'], fileName=None):
+
+    def render(self, mode=['html'], fileName=None, renderTime=1000):
         if type(mode) not in (list, tuple):
             mode=(mode,)
         self.getJsInputs()
@@ -713,15 +731,14 @@ function utfDecode(x){
               ]
         if self.publish:
             html='\n'.join(html)
-            from IPython.core.display import publish_html
-            publish_html(html)
-            return True
- 
+            from IPython.display import HTML
+            return HTML(html)
+
         import tempfile
         from os import unlink
         import subprocess
-        from time import sleep 
-        
+        from time import sleep
+
         html=['<html>',
               '<head>',
               '<title></title>',
@@ -731,33 +748,43 @@ function utfDecode(x){
               ['</body>',
               '</html>',]
         html='\n'.join(html)
- 
-        tempJs=tempfile.NamedTemporaryFile(mode="w+b", delete=False, suffix='.js')
-        tempJs.write(self.getPhantomJsScript(mode))
-        tempJs.flush()
-        tempJs.close()
- 
-        temp=tempfile.NamedTemporaryFile(mode="w+b", delete=False, suffix='.htm')
+
+        if 'keepTemp' not in mode:
+            tempJs=tempfile.NamedTemporaryFile(mode="w+b", delete=False, suffix='.js')
+            temp=tempfile.NamedTemporaryFile(mode="w+b", delete=False, suffix='.htm')
+        else:
+            tempJs=open(self.keepTempDir+'//ipyD3_temp.js', "wb")
+            temp=open(self.keepTempDir+'//ipyD3_temp.htm', "wb")
+
+        tempJs.write(self.getPhantomJsScript(mode, renderTime))
         temp.write(html)
-        temp.flush()
-        temp.close()
- 
-        phantomJs=r'''phantomjs {0} {1}'''.format(tempJs.name, temp.name)
-        phantomJsProc = subprocess.Popen( shlex.split(phantomJs), stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-        
+
+        if 'keepTemp' not in mode:
+            temp.flush()
+            tempJs.flush()
+            tempJs.close()
+            temp.close()
+            phantomJsArgs = (self.phantomExec, tempJs.name, temp.name)
+        else:
+            tempJs.close()
+            temp.close()
+            phantomJsArgs = (self.phantomExec, self.keepTempDir+'//ipyD3_temp.js', self.keepTempDir+'//ipyD3_temp.htm')
+
+        phantomJsProc = subprocess.Popen( phantomJsArgs,  stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+
         html = ''
         err = ''
         while phantomJsProc.poll() is None:
             sleep( 0.1 )
             html, err = phantomJsProc.communicate()
- 
-        unlink(temp.name)
-        unlink(tempJs.name)
- 
+        if 'keepTemp' not in mode:
+            unlink(temp.name)
+            unlink(tempJs.name)
+
         if 'html' in mode:
             if 'only' in mode:
                 return html
-            html=html.replace("&amp;", "&")
+            html=html.replace("&amp;", "&").replace("use href=", "use xlink:href=")
             if 'file'in mode and fileName!=None:
                 html=['<html>',
                       '<head>',
@@ -774,9 +801,8 @@ function utfDecode(x){
                 return True
             html='\n'.join(['<style>',self.css,'</style>'])+html
             if 'show'in mode:
-                from IPython.core.display import publish_html
-                publish_html(html)
-                return True
+                from IPython.display import HTML
+                return HTML(html)
             return html
         elif 'png' in mode:
             if 'only' in mode:
@@ -787,16 +813,14 @@ function utfDecode(x){
                 fileOpen.close()
                 return True
             if 'show'in mode:
-                from IPython.core.display import publish_png
-                publish_png(html)
-                return True
+                from IPython.display import Image
+                return Image(data=html)
             return html
 
- 
     def addSimpleTable(self,
-                 data, 
-                 dataAdd=[], 
-                 pVals=False, 
+                 data,
+                 dataAdd=[],
+                 pVals=False,
                  fontSizeCells=[],
                  sRows=[],
                  sColumns=[],
@@ -808,7 +832,7 @@ function utfDecode(x){
                  addBorders=1,
                  addOutsideBorders=-1,
                  rectWidth=45,
-                 rectHeight=0,       
+                 rectHeight=0,
                  ):
         if len(fontSizeCells)==0:
             fontSizeCells=[12]*(1+len(dataAdd))
@@ -844,15 +868,15 @@ function utfDecode(x){
                 },
                 rightPaneOffset=0
         )
-        
+
     def addPageBreak(self):
         self.addJs('''$("#"+d3ObjId).append('<div style="page-break-after:always; display:block; width:1px; height:1px;">&nbsp;</div>')''')
- 
+
     def getStandardCss(self, mode='jfCss'):
         if mode=='jfCss':
             return'''
-                    html{
-                        font-family: sans-serif;
+                    body{
+                        font-family: "Lucinda Grande", "Lucinda Sans Unicode", Helvetica, Arial, Verdana, sans-serif;
                     }
                     .d3Output{
                         min-height: 1.2em;
@@ -860,7 +884,7 @@ function utfDecode(x){
                         position: relative;
                         font-size: 1em;
                         padding: 5px 0;
-                    
+
                         list-style: none;
                         background: #fff;
                         color: #000;
@@ -875,23 +899,23 @@ function utfDecode(x){
                         font-weight: bold;
                         border-bottom: none;
                         font-size: 0.9em;
-                    
+
                     }
                     .d3Output.title{
                         text-align: center;
                         font-weight: bold;
                         border-bottom: none;
                         font-size: 1.2em;
-                    
+
                     }
-                    .d3Output.description{
+                    .d3Output .description, .d3Output.description{
                         font-size: 0.8em;
                         text-align:justify;
                         text-justify:inter-word;
                         border-bottom: 1px solid #000;
                     }
-                    .d3Output.description.panel{
-                        text-align: center;
+                    .d3Output .panel{
+                        text-align: center !important;
                     }
                     svg, canvas {
                         border-bottom: 1px solid #000;
@@ -902,4 +926,3 @@ function utfDecode(x){
                         border-bottom: none;
                     }
                     '''
-            

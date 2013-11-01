@@ -21,7 +21,7 @@ class d3object:
         self.keepTempDir = keepTempDir
         self.width=width
         self.html='<div id="{0}" class="d3Output"></div>'.format(self.id)
-        self.css=''
+        self.css=[]
         self.varsToPass={'width':width,
                          'height':height,
                          'd3ObjId':self.id,
@@ -83,8 +83,8 @@ function utfDecode(x){
 
         if d3!=None:
             if d3.__class__.__name__=='d3object':
-                if d3.css!='\n'+self.getStandardCss('jfCss'):
-                    self.addCss(d3.css)
+                if d3.css[0]!='\n'+self.getStandardCss('jfCss') or len(d3.css)>1:
+                    self.css=list(set(self.css) | set(d3.css))
                 d3.addPageBreak()
                 self.html='\n'.join((d3.render(mode=('only','html')),self.html))
             else:
@@ -93,7 +93,7 @@ function utfDecode(x){
         self.publish=publish
         if publish:
             from IPython.display import HTML
-            html='<style>\n{0}\n</style>\n{1}'.format(self.css, self.html)
+            html='<style>\n{0}\n</style>\n{1}'.format('\n'.join(self.css), self.html)
             return HTML(html)
             self.html=''
 
@@ -103,7 +103,9 @@ function utfDecode(x){
 
     def convertVar(self, var):
         typeVar=type(var)
-        if typeVar==numpy.ndarray:
+        if str(var)=='nan':
+            return None
+        elif typeVar==numpy.ndarray:
             return self.convertVar(var.tolist())
         elif typeVar == float or typeVar == numpy.float64:
             return round(var, self.precision)
@@ -116,6 +118,8 @@ function utfDecode(x){
             return outTemp
         elif typeVar in (str, int) or var==None:
             return var
+        elif typeVar==long:
+            return int(var)
         else:
             print typeVar
             raise TypeError
@@ -149,7 +153,11 @@ function utfDecode(x){
     def addCss(self, css):
         if type(css)!=str:
            raise TypeError
-        self.css+='\n{0}'.format(css)
+        if type(css)==list:
+            for c in css:
+                self.addCss(c)
+        else:
+            self.css.append('{0}'.format(css))
 
     def pValsStar(self, dataAdd, index=0):
         if len(dataAdd)==0:
@@ -169,6 +177,9 @@ function utfDecode(x){
         html=u'''<div class="figtags panel description" style="width: {0}px">{1}</div>'''.format(self.width, title).replace('\n','')
         self.addJs(''' $("#{0}").append('{html}');'''.format(self.id, html=html))
         return '-tag-{0}'.format(uuid1())
+
+    def getUUID(self, x):
+        return '-{1}-{0}'.format(uuid1(), x)
 
     def addTable(self,
          data=[],
@@ -225,7 +236,8 @@ function utfDecode(x){
         colorDomainIgnoreRows=[],
         colorRange=['#B9FB8A', '#9BF293', '#7EE79D', '#65DCA6', '#51CFAD', '#43C3B1', '#3FB5B3',
                 '#43A7B2', '#4C99AD', '#568BA6', '#5F7D9C', '#656F8F', '#696181', '#6A5471',
-                '#684861', '#633D51', '#5B3341', '#522A33', '#472226', '#3B1B1A', '#2E1510']
+                '#684861', '#633D51', '#5B3341', '#522A33', '#472226', '#3B1B1A', '#2E1510'],
+        barSize=0.6
 ):
         figTag='-tag-{0}'.format(uuid1())
         if type(pVals)!=bool:
@@ -235,37 +247,42 @@ function utfDecode(x){
         if sColumns==None:
             sColumns = ['' for _ in data]
 
-        colorDomain=[0,1]
-        if colorDomainAuto>0:
-            colorRangeData=data
-            if len(colorDomainAutoIgnoreColumns)+len(colorDomainAutoIgnoreRows)>0:
-                colorRangeData=[]
-                for i in xrange(len(data)):
-                    if i in colorDomainAutoIgnoreRows: continue
-                    for j in xrange(len(data[0])):
-                        if j in colorDomainAutoIgnoreColumns: continue
-                        colorRangeData.append(data[i][j])
+        if colorRange != None:
+            colorDomain=[0,1]
+            if colorDomainAuto>0:
+                colorRangeData=data
+                if len(colorDomainAutoIgnoreColumns)+len(colorDomainAutoIgnoreRows)>0:
+                    colorRangeData=[]
+                    for i in xrange(len(data)):
+                        if i in colorDomainAutoIgnoreRows: continue
+                        for j in xrange(len(data[0])):
+                            if j in colorDomainAutoIgnoreColumns: continue
+                            colorRangeData.append(data[i][j])
 
-            if colorDomainAuto==2:
-                avgRes=numpy.average(colorRangeData)
-                stdRes=numpy.std(colorRangeData, dtype=numpy.float64, ddof=1)
-                nObs=len(colorRangeData)
-                colorDomain=[max(numpy.min(colorRangeData),avgRes-stdRes/nObs*1.96),
-                                min(numpy.max(colorRangeData),avgRes+stdRes/nObs*1.96)]
-            if colorDomainAuto==1:
-                colorDomain=[numpy.min(colorRangeData),numpy.max(colorRangeData)]
+                if colorDomainAuto==2:
+                    avgRes=numpy.average(colorRangeData)
+                    stdRes=numpy.std(colorRangeData, dtype=numpy.float64, ddof=1)
+                    nObs=len(colorRangeData)
+                    colorDomain=[max(numpy.min(colorRangeData),avgRes-stdRes/nObs*1.96),
+                                    min(numpy.max(colorRangeData),avgRes+stdRes/nObs*1.96)]
+                if colorDomainAuto==1:
+                    colorDomain=[numpy.min(colorRangeData),numpy.max(colorRangeData)]
 
-        if colorDomainSymmetric:
-            colorDomain=max(numpy.fabs(colorDomain))
-            colorDomain=[-colorDomain, colorDomain]
-            colorRange=list(reversed(colorRange))+colorRange[1:]
-        if colorDomainMin:
-            colorDomain=[colorDomainMin, colorDomain[1]]
-        if colorDomainMax:
-            colorDomain=[colorDomain[0], colorDomainMax]
+            if colorDomainSymmetric:
+                colorDomain=max(numpy.fabs(colorDomain))
+                colorDomain=[-colorDomain, colorDomain]
+                colorRange=list(reversed(colorRange))+colorRange[1:]
+            if colorDomainMin:
+                colorDomain=[colorDomainMin, colorDomain[1]]
+            if colorDomainMax:
+                colorDomain=[colorDomain[0], colorDomainMax]
 
-        colorRangeLen=len(colorRange)
-        colorDomain=(numpy.array([i/colorRangeLen for i in xrange(colorRangeLen+1)])*(colorDomain[1]-colorDomain[0])+colorDomain[0]).tolist()
+            colorRangeLen=len(colorRange)
+            colorDomain=(numpy.array([i/colorRangeLen for i in xrange(colorRangeLen+1)])*(colorDomain[1]-colorDomain[0])+colorDomain[0]).tolist()
+        else:
+            colorDomain=[]
+            colorRange=[]
+
         self.addVar(  figTag=figTag,
                     colorDomain=colorDomain,
                     colorRange=colorRange,
@@ -290,6 +307,7 @@ function utfDecode(x){
                     colorDomainIgnoreRows=colorDomainIgnoreRows,
                     colorDomainMin=colorDomainMin if colorDomainMin else 'false',
                     colorDomainMax=colorDomainMax if colorDomainMax else 'false',
+                    barSize=barSize,
                   )
         self.addCss('''
             .heatmapCell path, .heatmapCell line, .heatmapCell polyline, .d3Output polyline {
@@ -305,6 +323,7 @@ function utfDecode(x){
         ''')
         self.addCss('#'+figTag+'{shape-rendering: crispEdges !important;}')
         self.addJs('''
+
         Array.prototype.sum = function() {
           return this.reduce(function(a,b){return a+b;});
         }
@@ -362,8 +381,24 @@ function utfDecode(x){
             var borderOffset=[0,0];
             if(addOutsideBorders>=0&&objId=='smallHeatmap')
                 borderOffset=[addOutsideBorders+1,addOutsideBorders+1];
+            var bars = {
+                'row': 0,
+                'col': 0
+            }
             for(var i=0; i<data[0].length; i++){
+                if(sColumns[0][i]=='|'){
+                    bars.col++;
+                }
+                bars.row=0;
                 for(var j=0; j<data.length; j++){
+                    if(sRows[0][j]=='|'){
+                        bars.row++;
+                        continue
+                    }
+                    if(sColumns[0][i]=='|'){
+                        continue
+                    }
+
                     if(addLength>0){
                         if(dataAdd[0][j][i]=='Error'){ continue; }
                         if(addLength>1){
@@ -372,7 +407,8 @@ function utfDecode(x){
                     }
                     var g=heatmap.append("g")
                             .attr("class", "heatmapCell")
-                            .attr("transform", "translate("+ (borderOffset[0]+(i)*(rectWidth+spacing)+addTextRows*(sRowsMargins.sum()+5)) +","+ (borderOffset[1]+(j)*(rectHeight+spacing)+addTextRows*(sColsMargins.sum()+5)) + ")")
+                            .attr("transform", "translate("+ (borderOffset[0]+(i)*(rectWidth+spacing)-bars.col*barSize*rectWidth+addTextRows*(sRowsMargins.sum()+5)) +","
+                                                           + (borderOffset[1]+(j)*(rectHeight+spacing)-bars.row*barSize*rectHeight+addTextRows*(sColsMargins.sum()+5)) + ")")
                     if(colorDomainIgnoreRows.indexOf(j)==-1 && colorDomainIgnoreColumns.indexOf(i)==-1)
                         g.append("rect")
                             .attr("y", rectHeight-fillProportion)
@@ -427,17 +463,19 @@ function utfDecode(x){
                 //Columns
                 for(var k=0; k<sColumns.length; k++){
                     var z=0;
+                    var bars = 0;
                     for(var i=0; i<data[0].length; i++){
+                        if(sColumns[0][i]=='|') bars++;
                         if(sColumns[k][i]==null){
                             z++;
                         }
-                        else if(sColumns[k][i]==''){
+                        else if(sColumns[k][i]==''||sColumns[0][i]=='|'){
                             z=0;
                         }
                         else{
                             var g=heatmap.append("g")
                                     .attr("class", "heatmapCell")
-                                    .attr("transform", "translate("+ ((i-z)*(rectWidth+spacing)+(sRowsMargins.sum()+5)) +",0)");
+                                    .attr("transform", "translate("+ ((i-z)*(rectWidth+spacing)+(sRowsMargins.sum()+5)-bars*barSize*rectWidth) +",0)");
                             g.append("text")
                                 .attr("x", (rectWidth/2)*(z+1)+z*spacing/2)
                                 .attr("y", sColsMargins.sum()-sColsMargins.slice(0,k+1).sum())
@@ -445,8 +483,7 @@ function utfDecode(x){
                                 .attr("text-anchor", "middle")
                                 .text(sColumns[k][i]);
                             g.append("polyline")
-                                    .attr("points", ""+ (0+shrinkHeadersBorders) +","+ (sColsMargins.sum()-sColsMargins.slice(0,k+1).sum()+5) +" "+ (rectWidth*(z+1)+z*spacing-shrinkHeadersBorders) +","\
-                                            +(sColsMargins.sum()-sColsMargins.slice(0,k+1).sum()+5)+"");
+                                    .attr("points", ""+ (0+shrinkHeadersBorders) +","+ (sColsMargins.sum()-sColsMargins.slice(0,k+1).sum()+5) +" "+ (rectWidth*(z+1)+z*spacing-shrinkHeadersBorders) +","                                            +(sColsMargins.sum()-sColsMargins.slice(0,k+1).sum()+5)+"");
                             z=0;
                         }
 
@@ -455,17 +492,19 @@ function utfDecode(x){
                 //Rows
                 for(var k=0; k<sRows.length; k++){
                     var z=0;
+                    var bars = 0;
                     for(var j=0; j<data.length; j++){
+                        if(sRows[0][j]=='|') bars++;
                         if(sRows[k][j]==null){
                             z++;
                         }
-                        else if(sRows[k][j]==''){
+                        else if(sRows[k][j]==''||sRows[0][j]=='|'){
                             z=0;
                         }
                         else{
                             var g=heatmap.append("g")
                                     .attr("class", "heatmapCell")
-                                    .attr("transform", "translate(0,"+ ((j-z)*(rectHeight+spacing)+(sColsMargins.sum()+5))+ ")");
+                                    .attr("transform", "translate(0,"+ ((j-z)*(rectHeight+spacing)+(sColsMargins.sum()+5)-bars*barSize*rectHeight)+ ")");
                             g.append("text")
                                 .attr("x", sRowsMargins.sum()-sRowsMargins.slice(0,k+1).sum())
                                 .attr("y", 0.5*(rectHeight*(z+1)+(z)*spacing+fontSizeHeaders))
@@ -473,8 +512,7 @@ function utfDecode(x){
                                 .attr("text-anchor", "end")
                                 .text(sRows[k][j]);
                             g.append("polyline")
-                                .attr("points", ""+ (sRowsMargins.sum()-sRowsMargins.slice(0,k+1).sum()+5) +","+ (0+shrinkHeadersBorders) + " "\
-                                    + (sRowsMargins.sum()-sRowsMargins.slice(0,k+1).sum()+5) +","+ ((z+1)*rectHeight+z*spacing-shrinkHeadersBorders) +"");
+                                .attr("points", ""+ (sRowsMargins.sum()-sRowsMargins.slice(0,k+1).sum()+5) +","+ (0+shrinkHeadersBorders) + " "                                    + (sRowsMargins.sum()-sRowsMargins.slice(0,k+1).sum()+5) +","+ ((z+1)*rectHeight+z*spacing-shrinkHeadersBorders) +"");
                             z=0;
                         }
                     }
@@ -661,9 +699,10 @@ function utfDecode(x){
                     color/*color*/,
                     regressionResults/*svg*/);
 
-        var objWidth=document.getElementById('svgElement'+d3ObjId+figTag).getBoundingClientRect()['width']
-        var objHeight=document.getElementById('svgElement'+d3ObjId+figTag).getBoundingClientRect()['height']
-        regressionResults.attr("transform", "translate("+ ((width-objWidth)/2) +","+ ((height-objHeight)/2) + ")")
+        var boundingRect=document.getElementById('svgElement'+d3ObjId+figTag).getBoundingClientRect();
+        var boundingRectParent=$(document.getElementById('svgElement'+d3ObjId+figTag)).parent()[0].getBoundingClientRect();
+        regressionResults.attr("transform", "translate("+ ((width-boundingRect.width)/2-boundingRectParent.left) +","+ ((height-boundingRect.height)/2+boundingRectParent.top-boundingRect.top) + ")")
+
         ''')
 
     def getPhantomJsScript(self, mode, renderTime=1000):
@@ -718,7 +757,7 @@ function utfDecode(x){
             mode=(mode,)
         self.getJsInputs()
         html=['<style>',
-              self.css,
+              '\n'.join(self.css),
               '</style>',
               '</head>',
               '<body>',
@@ -782,15 +821,15 @@ function utfDecode(x){
             unlink(tempJs.name)
 
         if 'html' in mode:
+            html=html.replace("&amp;", "&").replace("use href=", "use xlink:href=")
             if 'only' in mode:
                 return html
-            html=html.replace("&amp;", "&").replace("use href=", "use xlink:href=")
             if 'file'in mode and fileName!=None:
                 html=['<html>',
                       '<head>',
                       '</head>',
                       '<style>',
-                      self.css,
+                      '\n'.join(self.css),
                       '</style>',
                       html,
                       '</body>',
@@ -799,7 +838,7 @@ function utfDecode(x){
                 fileOpen.write('\n'.join(html))
                 fileOpen.close()
                 return True
-            html='\n'.join(['<style>',self.css,'</style>'])+html
+            html='\n'.join(['<style>','\n'.join(self.css),'</style>'])+html
             if 'show'in mode:
                 from IPython.display import HTML
                 return HTML(html)
@@ -833,6 +872,10 @@ function utfDecode(x){
                  addOutsideBorders=-1,
                  rectWidth=45,
                  rectHeight=0,
+                 barSize=0.6,
+                 colorRange=None,
+                 varLabels=[],
+
                  ):
         if len(fontSizeCells)==0:
             fontSizeCells=[12]*(1+len(dataAdd))
@@ -845,7 +888,7 @@ function utfDecode(x){
                  sColumns=sColumns,
                  sRowsMargins=sRowsMargins,
                  sColsMargins=sColsMargins,
-                 varLabels=[],
+                 varLabels=varLabels,
                  fontSizeHeaders=fontSizeHeaders,
                  shrinkHeadersBorders=shrinkHeadersBorders,
                  heatmapIgnoreText=1,
@@ -858,15 +901,27 @@ function utfDecode(x){
                      'addBorders':addBorders,
                      'addOutsideBorders':addOutsideBorders,
                      'rectWidth':rectWidth,
-                     'rectHeight':rectHeight if rectHeight>0 else sum(fontSizeCells)+10+2*len(dataAdd),
+                     'rectHeight':rectHeight if rectHeight>0 else int(sum(fontSizeCells)+10+2*len(dataAdd)),
                 },
                 smallHeatmap={
                      'draw':0,
+                     'spacing':0,
+                     'fillProportion':4,
+                     'addText':0,
+                     'addTextRows':0,
+                     'addBorders':0,
+                     'addOutsideBorders':-1,
+                     'rectWidth':4,
+                     'rectHeight':4,
                 },
                 legend= {
-                    'draw':0,
+                    'draw':min(len(varLabels),1),
+                    'rectWidth': rectWidth,
+                     'rectHeight':rectHeight if rectHeight>0 else int(sum(fontSizeCells)+10+2*len(dataAdd)),
                 },
-                rightPaneOffset=0
+                rightPaneOffset=min(len(varLabels),1)*120,
+                colorRange=colorRange,
+                barSize=barSize
         )
 
     def addPageBreak(self):
@@ -916,6 +971,7 @@ function utfDecode(x){
                     }
                     .d3Output .panel{
                         text-align: center !important;
+                        page-break-after:avoid;
                     }
                     svg, canvas {
                         border-bottom: 1px solid #000;
